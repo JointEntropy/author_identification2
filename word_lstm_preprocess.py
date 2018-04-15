@@ -11,6 +11,32 @@ import configs
 from char_lstm_preprocess import filter_chars
 import numpy as np
 
+
+oc2upos = {  # OPENCORPORA(pymorphy2)  to UPoS
+    'NOUN'	: 'NOUN',
+    'ADJF'	: 'ADJ',
+    'ADJS'	: 'ADJ',
+    'COMP'	: 'ADJ',
+    'VERB'	: 'VERB',
+    'INFN'	: 'VERB',
+
+    'PRTF'	: 'VERB',  # причастие (полное)	прочитавший, прочитанная
+    'PRTS'	: 'VERB',  # причастие (краткое)	прочитана
+
+    'GRND'	: 'VERB',  # деепричастие	прочитав, рассказывая
+    'NUMR'	: 'NUN',   # числительное	три, пятьдесят
+
+    'ADVB'	: 'ADV',   # наречие
+
+    'NPRO'	: 'NOUN',  # местоимение-существительное	он
+    'PRED'	: 'VERB',  # предикатив	некогда
+    'PREP'	: 'PRT',   # предлог	в
+
+    'CONJ'	: 'SCONJ',  # союзы
+    'PRCL'	: 'PRT',   # частицы
+    'INTJ'	: 'INTJ'       # междометие	ой
+}
+
 morph = pymorphy2.MorphAnalyzer()
 
 
@@ -48,7 +74,7 @@ def extract_word_pos(word):
     except ValueError:
         pass
     parsed = morph.parse(word)[0]
-    return '{}_{}'.format(parsed.normal_form, parsed.tag.POS)
+    return '{}_{}'.format(parsed.normal_form, oc2upos.get(parsed.tag.POS, 'X'))
 
 
 def extract_from(texts, extractor, tokenizer):
@@ -58,7 +84,7 @@ def extract_from(texts, extractor, tokenizer):
 
 
 if __name__ == '__main__':
-    output_words_path = configs.WORDS_PATH + '/PoS_words_counter'
+    output_words_path = configs.WORDS_PATH + '/uPoS_words'
 
     data = pd.read_csv('data/dataset.csv')
     filtered_data = filter_chars(data['text'])
@@ -67,7 +93,7 @@ if __name__ == '__main__':
                              tokenizer=simple_tokenizer)))
 
     save_obj(poswords, output_words_path)
-
+    print(poswords)
 
 
 # stop words appendix
