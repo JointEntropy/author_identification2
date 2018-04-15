@@ -110,14 +110,30 @@ def filter_by_samples_count(df, samples_threshold=10, verbose=1):
     return data
 
 
-def preprocessing(df, tokenizer,
+def preprocessing(df, encode,
                   inputlen=50,  # input max sequence length
                   shuffle=False,
                   ohe=None):
+    """
+    Берёт df  с полями text и author.
+    Для каждого текста из df['text'] применяет метод encode. Полученную последовательность усекает
+    или дополняет до размера inputlen.
+    Для каждого автора из df['authors'] кодирует его с помощью уже обученного ohe(one hot encoder)'а.
+    После этого случайно сортирует все тексты(вместе с их метками).
+    :param df: dataframe  с полями 'author' и 'text'
+    :param encode: метод для получения из текстов нужной последовательности.
+                            для char это метод разбивающий список текстов на символы и кодирующий их, а
+                            для words это метод разбивающий список текстов на слова и кодирующий их.
+
+    :param inputlen:  максимальная длина последовательности
+    :param shuffle:   перемешивать ли смэплы
+    :param ohe:       обученный one hot encoder для авторов.
+    :return:
+    """
     from keras.preprocessing.sequence import pad_sequences
     labels = ohe.transform(df['author'].values.reshape(-1, 1))
     contexts, labels = df['text'].values,  labels
-    contexts = tokenizer.texts_to_sequences(contexts)
+    contexts = encode(contexts)
     contexts = pad_sequences(contexts, maxlen=inputlen)
     if shuffle:
         indices = np.arange(contexts.shape[0])

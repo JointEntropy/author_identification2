@@ -44,7 +44,10 @@ def simple_tokenizer(line):
     return line.translate(str.maketrans("", "", string.punctuation)).lower().split()
 
 
-class cTokenizer:
+class WordsTokenizer:
+    def __init__(self, ignore_unknown=False):
+        self.ignore_unknown = ignore_unknown
+
     def fit_on_words(self, ready_words):
         self.knowing_words = ready_words
         self.word_index = set(ready_words.keys())
@@ -54,7 +57,10 @@ class cTokenizer:
         total_missed = 0
         for line in sentences:
             words = simple_tokenizer(line)
-            tokens = [self.knowing_words.get(word, len(self.word_index) + 1) for word in words]
+            if self.ignore_unknown:
+                tokens = [self.knowing_words[word] for word in words if word in self.knowing_words]
+            else:
+                tokens = [self.knowing_words.get(word, len(self.word_index) + 1) for word in words]
             total_missed += (np.array(tokens) == len(self.word_index) + 1).sum()
             texts.append(tokens)
         if debug:
@@ -88,9 +94,12 @@ if __name__ == '__main__':
 
     data = pd.read_csv('data/dataset.csv')
     filtered_data = filter_chars(data['text'])
-    poswords = Counter(chain(extract_from(filtered_data,
+    gen = chain(extract_from(filtered_data,
                              extractor=extract_word_pos,
-                             tokenizer=simple_tokenizer)))
+                             tokenizer=simple_tokenizer))
+    poswords = Counter(gen)
+    # хранить counter правильнее, потому что потом если что можно выкинуть слишком редкие слова. Иначе
+    # поиск этих слов в embedding'ах происходит непозволительно долго
 
     save_obj(poswords, output_words_path)
     print(poswords)
