@@ -50,12 +50,12 @@ class WordsTokenizer:
 
     def fit_on_words(self, ready_words):
         self.knowing_words = ready_words
-        self.word_index = set(ready_words.keys())
+        self.word_index = set(list(ready_words.keys()))
 
     def texts_to_sequences(self, sentences, debug=False):
         texts = []
         total_missed = 0
-        for line in sentences:
+        for line in tqdm(sentences):
             words = simple_tokenizer(line)
             if self.ignore_unknown:
                 tokens = [self.knowing_words[word] for word in words if word in self.knowing_words]
@@ -89,20 +89,42 @@ def extract_from(texts, extractor, tokenizer):
         yield from (extractor(word) for word in words)
 
 
+def get_normalized_pos_texts(ser):
+    """
+    Normalize each text word and add PoS tag o it(as in dict for embeddings) in df['text'].
+    :param ser: tokenized texts
+    :return:
+    """
+    for i, words in enumerate(tqdm(ser)):
+        yield [extract_word_pos(word) for word in words]
+
+
 if __name__ == '__main__':
-    output_words_path = configs.WORDS_PATH + '/uPoS_words'
+    ### TO PREPROCESS
+    # output_words_path = configs.WORDS_PATH + '/uPoS_words'
+    #
+    # data = pd.read_csv('data/dataset.csv')
+    # filtered_data = filter_chars(data['text'])
+    # gen = chain(extract_from(filtered_data,
+    #                          extractor=extract_word_pos,
+    #                          tokenizer=simple_tokenizer))
+    # poswords = Counter(gen)
+    # # хранить counter правильнее, потому что потом если что можно выкинуть слишком редкие слова. Иначе
+    # # поиск этих слов в embedding'ах происходит непозволительно долго
+    #
+    # save_obj(poswords, output_words_path)
+    # print(poswords)
+
+
+
+    ### TO PREPARE(normalize) DATASET TEXTS
+    output_normalized_path = 'data/dataset'
 
     data = pd.read_csv('data/dataset.csv')
     filtered_data = filter_chars(data['text'])
-    gen = chain(extract_from(filtered_data,
-                             extractor=extract_word_pos,
-                             tokenizer=simple_tokenizer))
-    poswords = Counter(gen)
-    # хранить counter правильнее, потому что потом если что можно выкинуть слишком редкие слова. Иначе
-    # поиск этих слов в embedding'ах происходит непозволительно долго
+    data['text'] = normalize_texts(data['text'])
+    pd.data
 
-    save_obj(poswords, output_words_path)
-    print(poswords)
 
 
 # stop words appendix

@@ -8,6 +8,8 @@ import configs
 import os
 import json
 import configs
+from word_lstm_preprocess import simple_tokenizer, filter_chars, get_normalized_pos_texts
+
 
 headers_csv_path = 'data/prepared_info.csv'
 
@@ -41,8 +43,8 @@ def textsdf2dataset(df):
     pass
 
 
-def filter_by_len(df, low_threshold=25):
-    token_lens = df['text'].str.split().apply(len)
+def filter_by_len(df, low_threshold=100):
+    token_lens = df['text'].apply(len)
     mask = (token_lens > low_threshold)
     df = df[mask]
     return df
@@ -92,7 +94,6 @@ def delete_duplicates_by_hash(df):
             selection.append(i)
     data = df.loc[selection, :]
     return data
-    pass
 
 
 def filter_by_samples_count(df, samples_threshold=10, verbose=1):
@@ -143,10 +144,74 @@ def preprocessing(df, encode,
     return contexts,  labels
 
 
+def split_text(text, classlabel, inputlen):
+    """
+    Split text into parts of size inputlen.
+    Output placed into new dataframe.
+    :param text:
+    :param classlabel:
+    :param inputlen: max len(in tokens) of text.
+    :return:
+    """
+    texts = np.array_split(text, int(len(text)/inputlen))
+    return pd.DataFrame({
+        'text': texts,
+        'author': classlabel
+    })
+
+
+def harmonize_textsdf(df, inputlen):
+    """
+    Harmonize dataset texts in such way:
+    to long texts is splitted into parts to preserve each text size(in tokens)  in range 1.5*inputlen.
+    :param df:
+    :param inputlen:
+    :return:
+    """
+    to_remove = []
+    res = df
+    for i, sample in df.iterrows():
+        sample, label = sample['text'], sample['author']
+        if len(sample) > 1.5*inputlen:
+            to_remove.append(i)
+            res = pd.concat([res, split_text(sample, label, inputlen)], axis=0).reset_index(drop=True)
+    remain = set(df.index) - set(to_remove)
+    df = df.loc[list(remain)]
+    return df
+
+
+def do_many_things(df):
+
+    tokenized = filter_chars(df['text']).apply(simple_tokenizer)
+    df['text'] = tokenized
+    print('фильтруем данные по числу токенов(токенизация происходит внутри функции...')
+    df = filter_by_len(df)
+    print('гармонизируем датаст, разбивая длинные тексты( по числу токенов) на отдельные сэмплы.')
+    median_len = np.median(df['text'].apply(len))
+    print('Было сэмплов: ', df.shape[0])
+    df = harmonize_textsdf(df, int(median_len))
+    print('Стало сэмплов: ', df.shape[0])
+
+    print('нормализуем слова и добавляем к ним части речи...')
+    df['text'] = list(get_normalized_pos_texts(df['text']))  # принимает токензирваонные тексты
+
+    print('приводим токенизированный текст назад к строкам...')
+    df['text'] = df['text'].apply(lambda x: ' '.join(x))
+    print('удаляем авторов, чьё число текстов чересчур мало...')
+    return filter_by_samples_count(df)
+
+
 if __name__ == '__main__':
+    # открываем данные с заголовками текстов.
     headers_df = pd.read_csv(headers_csv_path, sep=',', quotechar='/', index_col='id')
+
+    print('фильтруем тексты по метаинформации о них в строках заголовков...')
     headers_df = header_filter(headers_df)
+    print('подгружаем сами тексты из заголовков...')
     texts_df = fetch_text_from_headers(headers_df)
-    texts_df = filter_by_samples_count(texts_df)
-    texts_df = filter_by_len(texts_df)
+    texts_df.to_csv(configs.HUGE_DATA_PATH+'dataset.csv')
+
+    texts_df = pd.read_csv(configs.HUGE_DATA_PATH+'dataset.csv')
+
+    print('сохраняем сбрасывая индекс(чтобы был без пропусков...')
     texts_df.to_csv('data/dataset.csv', index=False)

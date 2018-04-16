@@ -55,15 +55,19 @@ import configs
 
 def read_emb(filename, max_words=10**5):
     words = []
+
     with open(filename,'r') as f:
         N, d = f.readline().split()
         N,d = int(N), int(d)
+
+        max_words = N if max_words is None else max_words
+
         emb_matr = np.zeros(shape=(max_words, d), dtype=np.float64)
         for i, line in enumerate(f):
             word, vec = line.split(' ',1)
             words.append(word)
             emb_matr[i] = np.fromstring(vec, dtype=float, sep=' ')
-            if i==max_words-1: break
+            if  (i==max_words-1): break
     return words, emb_matr
 
 
@@ -89,32 +93,47 @@ def get_words(ser):
     return set(chain.from_iterable(ser))
 
 
+def filter_most_common(counter_instance,  max_count=6*10**4):
+    return set(dict(counter_instance.most_common(max_count)).keys())
+
+
 if __name__ == '__main__':
     os.chdir('..')
     emb_path = configs.EMBEDDINGS_PATH + '/ruwikiruscorpora_upos_skipgram_300_2_2018.vec'
-    words_path = configs.WORDS_PATH + '/PoS_words_counter'
+    words_path = configs.WORDS_PATH +  '/uPoS_words'  # '/PoS_words_counter'
     output_emb_path = configs.EMBEDDINGS_PATH + '/my_plus_corpora_emb'
     output_words_path = configs.WORDS_PATH + '/my_plus_corpora_words'
 
+    all_words = load_obj(words_path)  # тут вновь нужно сделать set(....keys()), ибо юзаем Counter
+    print(type(all_words))
+    # all_words = filter_most_common(all_words) #  для Counter
+    # all_words = set(list(all_words)[:10*10**4])  # для обычного набора
 
-    print(load_obj(words_path))
+    emb_file_is_large = False
+    if emb_file_is_large:
+        # ПЕРВЫЙ СТУЛ
+        # извлекаем первые 10**5 слов из файла с эмбедингами
+        pop_words, emb_matr = read_emb(emb_path, 2*10**5)
+        print('Всего слов в  train', len(all_words))
+        print('Общих слов в первой', len(all_words & set(pop_words)))
 
+        remain_seek_words = list(all_words - set(pop_words))
+        #
+        extra_words, extra_emb = select_remain(emb_path, remain_seek_words)
+        print('Не нашлось слов', len(set(remain_seek_words) - set(extra_words)))
+        print('Нашлось дополнительных слов', len(extra_words))
 
+        # Сохраняем результат
+        total_words = pop_words + extra_words
+        total_emb = np.concatenate([emb_matr, extra_emb])
+    else:
+        # ВТОРОЙ СТУЛ
+        pop_words, emb_matr = read_emb(emb_path, max_words=None)
+        common_words = all_words & set(pop_words)
+        select_mask = pd.Series(pop_words).isin(common_words)
+        total_words, total_emb = np.array(pop_words)[select_mask], emb_matr[select_mask]
 
-    # # извлекаем первые 10**5 слов из файла с эмбедингами
-    # pop_words, emb_matr = read_emb(emb_path, 2*10**5)
-    #
-    # all_words = load_obj(words_path).values()
-    # remain_seek_words = list(all_words - set(pop_words))
-    #
-    # extra_words, extra_emb = select_remain(emb_path, remain_seek_words)
-    # print('Не нашлось слов', len(set(remain_seek_words) - set(extra_words)))
-    # print('Нашлось дополнительных слов', len(extra_words))
-    #
-    # # Сохраняем результат
-    # total_words = pop_words + extra_words
-    # total_emb = np.concatenate([emb_matr, extra_emb])
-    # total_words = dict((word, idx) for idx, word in enumerate(total_words))
-    #
-    # save_obj(total_words, output_words_path)
-    # save_obj(total_emb, output_emb_path)
+    # сохраняем
+    total_words = dict((word, idx) for idx, word in enumerate(total_words))
+    save_obj(total_words, output_words_path)
+    save_obj(total_emb, output_emb_path)
