@@ -56,7 +56,7 @@ class WordsTokenizer:
         texts = []
         total_missed = 0
         for line in tqdm(sentences):
-            words = simple_tokenizer(line)
+            words = line.split() #simple_tokenizer(line) ибо портит регистр и убирает подчёркивания
             if self.ignore_unknown:
                 tokens = [self.knowing_words[word] for word in words if word in self.knowing_words]
             else:

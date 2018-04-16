@@ -168,9 +168,9 @@ def harmonize_textsdf(df, inputlen):
         if len(sample) > 1.5*inputlen:
             to_remove.append(i)
             res = pd.concat([res, split_text(sample, label, inputlen)], axis=0).reset_index(drop=True)
-    remain = set(df.index) - set(to_remove)
-    df = df.loc[list(remain)]
-    return df
+    remain = set(res.index) - set(to_remove)
+    res = res.loc[list(remain)].reset_index(drop=True)
+    return res
 
 
 def do_many_things(df):
