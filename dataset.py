@@ -39,62 +39,58 @@ def fetch_text_from_headers(headers_df):
     return pd.DataFrame({'text': texts, 'author': headers_df['author'].values})
 
 
-def textsdf2dataset(df):
-    pass
-
-
 def filter_by_len(df, low_threshold=100):
     token_lens = df['text'].apply(len)
     mask = (token_lens > low_threshold)
     df = df[mask]
     return df
 
-
-def filter_by_genre(headers_df, genre="Русская проза, малые формы"):
-    """
-    Есть <img src="https://cs9.pikabu.ru/post_img/2017/02/24/5/1487918509199879809.jpg" width=100px style="display:inline;">:
-
-        1. работать с русской прозой, ибо большие тексты легче классифицировать. Здесь нужно юзать ebmedding'и(учить самому, или брать готовые).
-        2. работать с русской поэзией, и юзать char-rnn, потому что в некоторых текстах вообще по 50 символов
-    **Update** (нашёлся третий стул):
-        > можно забить на категории и просто взять из выборки те тексты, которые нам нравятся по размеру.
-    :param df:
-    :param genre:
-    :return:
-    """
-    df = headers_df
-    df['cats'] = df['cats'].fillna('[]')
-    df['cats'] = df['cats'].apply(eval)
-    mask = df['cats'].apply(lambda _: (genre in _) \
-        if _ not in [None, nan] else False)
-    return df[mask]
-
-
-def delete_duplicates_by_hash(df):
-    """
-    Update:
-    каким-то образом в выборке всё таки оказались дублирующиеся тексты.
-    Вычистим их, взяв хэш от самого текста. Можно,конечно, и проще как-то так...:
-    hash(имя автора+имя текста+...)  но не будем искать лёгких путей).
-    :param df:
-    :return:
-    """
-    df = df.copy()
-    df['text_hash'] = df['text'].apply(hash)
-    hashes_counts = df['text_hash'].value_counts()
-    bad_hashes = set(hashes_counts[hashes_counts != 1].index)
-    good_hashes = set(hashes_counts[hashes_counts == 1].index)
-    selection = []
-    for i, row in tqdm(df.iterrows(), total=df.shape[0]):
-        hash_ = row['text_hash']
-        if hash_ in bad_hashes:
-            selection.append(i)
-            bad_hashes = bad_hashes - set([hash_])
-        elif hash_ in good_hashes:
-            selection.append(i)
-    data = df.loc[selection, :]
-    return data
-
+#
+# def filter_by_genre(headers_df, genre="Русская проза, малые формы"):
+#     """
+#     Есть <img src="https://cs9.pikabu.ru/post_img/2017/02/24/5/1487918509199879809.jpg" width=100px style="display:inline;">:
+#
+#         1. работать с русской прозой, ибо большие тексты легче классифицировать. Здесь нужно юзать ebmedding'и(учить самому, или брать готовые).
+#         2. работать с русской поэзией, и юзать char-rnn, потому что в некоторых текстах вообще по 50 символов
+#     **Update** (нашёлся третий стул):
+#         > можно забить на категории и просто взять из выборки те тексты, которые нам нравятся по размеру.
+#     :param df:
+#     :param genre:
+#     :return:
+#     """
+#     df = headers_df
+#     df['cats'] = df['cats'].fillna('[]')
+#     df['cats'] = df['cats'].apply(eval)
+#     mask = df['cats'].apply(lambda _: (genre in _) \
+#         if _ not in [None, nan] else False)
+#     return df[mask]
+#
+#
+# def delete_duplicates_by_hash(df):
+#     """
+#     Update:
+#     каким-то образом в выборке всё таки оказались дублирующиеся тексты.
+#     Вычистим их, взяв хэш от самого текста. Можно,конечно, и проще как-то так...:
+#     hash(имя автора+имя текста+...)  но не будем искать лёгких путей).
+#     :param df:
+#     :return:
+#     """
+#     df = df.copy()
+#     df['text_hash'] = df['text'].apply(hash)
+#     hashes_counts = df['text_hash'].value_counts()
+#     bad_hashes = set(hashes_counts[hashes_counts != 1].index)
+#     good_hashes = set(hashes_counts[hashes_counts == 1].index)
+#     selection = []
+#     for i, row in tqdm(df.iterrows(), total=df.shape[0]):
+#         hash_ = row['text_hash']
+#         if hash_ in bad_hashes:
+#             selection.append(i)
+#             bad_hashes = bad_hashes - set([hash_])
+#         elif hash_ in good_hashes:
+#             selection.append(i)
+#     data = df.loc[selection, :]
+#     return data
+#
 
 def filter_by_samples_count(df, samples_threshold=10, verbose=1):
     """
@@ -144,22 +140,6 @@ def preprocessing(df, encode,
     return contexts,  labels
 
 
-def split_text(text, classlabel, inputlen):
-    """
-    Split text into parts of size inputlen.
-    Output placed into new dataframe.
-    :param text:
-    :param classlabel:
-    :param inputlen: max len(in tokens) of text.
-    :return:
-    """
-    texts = np.array_split(text, int(len(text)/inputlen))
-    return pd.DataFrame({
-        'text': texts,
-        'author': classlabel
-    })
-
-
 def harmonize_textsdf(df, inputlen):
     """
     Harmonize dataset texts in such way:
@@ -170,6 +150,19 @@ def harmonize_textsdf(df, inputlen):
     """
     to_remove = []
     res = df
+
+    def split_text(text, classlabel, inputlen):
+        """
+        Split text into parts of size inputlen.
+        Output placed into new dataframe.
+        :param text:
+        :param classlabel:
+        :param inputlen: max len(in tokens) of text.
+        :return:
+        """
+        texts = np.array_split(text, int(len(text) / inputlen))
+        return pd.DataFrame({ 'text': texts, 'author': classlabel })
+
     for i, sample in df.iterrows():
         sample, label = sample['text'], sample['author']
         if len(sample) > 1.5*inputlen:
@@ -209,9 +202,9 @@ if __name__ == '__main__':
     headers_df = header_filter(headers_df)
     print('подгружаем сами тексты из заголовков...')
     texts_df = fetch_text_from_headers(headers_df)
-    texts_df.to_csv(configs.HUGE_DATA_PATH+'dataset.csv')
+    texts_df.to_csv(configs.HUGE_DATA_PATH+'/dataset.csv')
 
-    texts_df = pd.read_csv(configs.HUGE_DATA_PATH+'dataset.csv')
-
-    print('сохраняем сбрасывая индекс(чтобы был без пропусков...')
-    texts_df.to_csv('data/dataset.csv', index=False)
+    # texts_df = pd.read_csv(configs.HUGE_DATA_PATH+'dataset.csv')
+    # texts_df = do_many_things(texts_df)
+    # print('сохраняем сбрасывая индекс(чтобы был без пропусков...')
+    # texts_df.to_csv('data/dataset.csv', index=False)
