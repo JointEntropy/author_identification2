@@ -39,7 +39,7 @@ def fetch_text_from_headers(headers_df):
     return pd.DataFrame({'text': texts, 'author': headers_df['author'].values})
 
 
-def filter_by_len(df, low_threshold=100):
+def filter_by_len(df, low_threshold=500):
     token_lens = df['text'].apply(len)
     mask = (token_lens > low_threshold)
     df = df[mask]
@@ -174,23 +174,16 @@ def harmonize_textsdf(df, inputlen):
 
 
 def do_many_things(df):
-
     tokenized = filter_chars(df['text']).apply(simple_tokenizer)
     df['text'] = tokenized
-    print('фильтруем данные по числу токенов(токенизация происходит внутри функции...')
-    df = filter_by_len(df)
-    print('гармонизируем датаст, разбивая длинные тексты( по числу токенов) на отдельные сэмплы.')
-    median_len = np.median(df['text'].apply(len))
-    print('Было сэмплов: ', df.shape[0])
-    df = harmonize_textsdf(df, int(median_len))
-    print('Стало сэмплов: ', df.shape[0])
+    print('Фильтруем данные по числу символов...')
 
-    print('нормализуем слова и добавляем к ним части речи...')
+    print('Нормализуем слова и добавляем к ним части речи...')
     df['text'] = list(get_normalized_pos_texts(df['text']))  # принимает токензирваонные тексты
 
-    print('приводим токенизированный текст назад к строкам...')
+    print('Приводим токенизированный текст назад к строкам...')
     df['text'] = df['text'].apply(lambda x: ' '.join(x))
-    print('удаляем авторов, чьё число текстов чересчур мало...')
+    print('Удаляем авторов, чьё число текстов чересчур мало...')
     return filter_by_samples_count(df)
 
 
