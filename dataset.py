@@ -160,8 +160,8 @@ def harmonize_textsdf(df, inputlen):
         :param inputlen: max len(in tokens) of text.
         :return:
         """
-        texts = np.array_split(text, int(len(text) / inputlen))
-        return pd.DataFrame({ 'text': texts, 'author': classlabel })
+        texts = np.array_split(list(text), int(len(text) / inputlen))
+        return pd.DataFrame({ 'text': pd.Series(texts).apply(lambda x: ''.join(x)), 'author': classlabel })
 
     for i, sample in df.iterrows():
         sample, label = sample['text'], sample['author']
