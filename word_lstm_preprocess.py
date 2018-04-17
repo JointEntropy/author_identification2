@@ -10,7 +10,9 @@ import pandas as pd
 import configs
 from char_lstm_preprocess import filter_chars
 import numpy as np
-
+from tqdm import tqdm
+from word_lstm_preprocess import mystem2upos
+from pymystem3 import Mystem
 
 oc2upos = {  # OPENCORPORA(pymorphy2)  to UPoS
     'NOUN'	: 'NOUN',
@@ -37,7 +39,25 @@ oc2upos = {  # OPENCORPORA(pymorphy2)  to UPoS
     'INTJ'	: 'INTJ'       # междометие	ой
 }
 
-morph = pymorphy2.MorphAnalyzer()
+
+mystem2upos = {  # stolen from https://github.com/akutuzov/universal-pos-tags/blob/4653e8a9154e93fe2f417c7fdb7a357b7d6ce333/ru-rnc.map
+    'A'    :   'ADJ',
+    'ADV'   :  'ADV' ,
+    'ADVPRO' : 'ADV',
+    'ANUM'  :  'ADJ',
+    'APRO'  :  'DET',
+    'COM'   : 'ADJ',
+    'CONJ'  :  'SCONJ',
+    'INTJ'   : 'INTJ',
+    'NONLEX' : 'X',
+    'NUM'   :  'NUM',
+    'PART'  :  'PART',
+    'PR'    :  'ADP',
+    'S'     :  'NOUN',
+    'SPRO'  :  'PRON',
+    'UNKN' :   'X',
+    'V'    :   'VERB'
+}
 
 
 def simple_tokenizer(line):
@@ -68,35 +88,90 @@ class WordsTokenizer:
         return texts
 
 
-def inverse_ohe(ohe_outputs, ohe_encoder):
-    return ohe_encoder.active_features_[ohe_outputs.argmax(axis=1)]
-
-
-def extract_word_pos(word):
-    try:
-        int(word)
-        word = 'x' * len(word)
-        return '{}_NUM'.format(word)
-    except ValueError:
-        pass
-    parsed = morph.parse(word)[0]
-    return '{}_{}'.format(parsed.normal_form, oc2upos.get(parsed.tag.POS, 'X'))
-
-
 def extract_from(texts, extractor, tokenizer):
     for i, line in enumerate(tqdm(texts)):
         words = tokenizer(line)
         yield from (extractor(word) for word in words)
 
 
-def get_normalized_pos_texts(ser):
+def pymorphy_normalizer(ser):
     """
     Normalize each text word and add PoS tag o it(as in dict for embeddings) in df['text'].
     :param ser: tokenized texts
     :return:
     """
+    morph = pymorphy2.MorphAnalyzer()
+
+    def extract_pos(word):
+        try:
+            int(word)
+            word = 'x' * len(word)
+            return '{}_NUM'.format(word)
+        except ValueError:
+            pass
+        parsed = morph.parse(word)[0]
+        return '{}_{}'.format(parsed.normal_form, oc2upos.get(parsed.tag.POS, 'X'))
+
     for i, words in enumerate(tqdm(ser)):
-        yield [extract_word_pos(word) for word in words]
+        yield [extract_pos(word) for word in words]
+
+
+def mystem_normalizer(texts, batch_size=150, mapping=mystem2upos):
+    """
+    Normalizer(lemmatisation and PoS tagging) with Mystem backend.
+    :param texts:
+    :param batch_size:
+    :param mapping:
+    :return:
+    """
+    m = Mystem()  # not very good place to store it.
+
+    def pos_extractor(token, mapping):
+        normal_form, pos = token['lex'], token['gr'].split('=')[0].split(',')[0]
+        pos = mapping.get(pos, 'X') if mapping  is not None else pos
+        return '{}_{}'.format(normal_form, pos)
+
+    for batch_start in range(0, len(texts), batch_size):
+        batch = texts[batch_start: batch_start + batch_size]
+        total = ' $ '.join(batch.apply(lambda x: x.replace('\n', '').replace('$', '')))
+
+        text = []
+        for word in m.analyze(total):
+            if word['text'] == '$':
+                yield ' '.join(text)
+                text = []
+                continue
+            try:
+                token = word['analysis'][0]
+            except (KeyError, IndexError) as e:
+                continue
+            text.append(pos_extractor(token, mapping=mapping))
+        yield ' '.join(text)
+
+
+class Normalizer:
+    def __init__(self, backend='mystem', tokenizer=None):
+        self.backend = backend
+        self.tokenizer = tokenizer
+
+    def normalize(self, texts):
+        result = []
+        if self.backend == 'mystem':
+            # mystem expect text data not tokenized
+            for text in tqdm(mystem_normalizer(texts), total=len(texts)):
+                result.append(text)
+
+        elif self.backend == 'pymorphy':
+            if self.tokenizer:
+                texts = self._tokenize(texts)
+            for text in pymorphy_normalizer(texts):
+                result.append(' '.join(text))
+        else:
+            raise ValueError('Invalid backend !')
+        return result
+
+    def _tokenize(self, texts):
+        return self.tokenizer(texts)
 
 
 if __name__ == '__main__':

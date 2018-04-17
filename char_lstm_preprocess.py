@@ -18,7 +18,7 @@ def filter_chars(ser, allowed=ALLOWED_CHARS, forbidden2space=True):
     WARNING: As side effect will strip and lower inputs.
     :param ser:
     :param allowed: set of allowed chars.
-    :param forbidden2space: if true, will replace forbidden chars into spaces, else just throw  then away.
+    :param forbidden2space: if true, will replace forbidden chars into spaces, else just throw  them away.
     :return:
     """
     ser = ser.str.strip()

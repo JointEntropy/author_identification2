@@ -14,6 +14,11 @@ from word_lstm_preprocess import simple_tokenizer, filter_chars, get_normalized_
 headers_csv_path = 'data/prepared_info.csv'
 
 
+def inverse_ohe(ohe_outputs, ohe_encoder):
+    return ohe_encoder.active_features_[ohe_outputs.argmax(axis=1)]
+
+
+
 def header_filter(headers_df):
     df = headers_df
     # оставляем авторов, чье число произвдеений больше 100
@@ -39,7 +44,7 @@ def fetch_text_from_headers(headers_df):
     return pd.DataFrame({'text': texts, 'author': headers_df['author'].values})
 
 
-def filter_by_len(df, low_threshold=500):
+def filter_by_len(df, low_threshold=250):
     token_lens = df['text'].apply(len)
     mask = (token_lens > low_threshold)
     df = df[mask]
@@ -174,13 +179,11 @@ def harmonize_textsdf(df, inputlen):
 
 
 def do_many_things(df):
+    print('Токенезируем')
     tokenized = filter_chars(df['text']).apply(simple_tokenizer)
     df['text'] = tokenized
-    print('Фильтруем данные по числу символов...')
-
     print('Нормализуем слова и добавляем к ним части речи...')
     df['text'] = list(get_normalized_pos_texts(df['text']))  # принимает токензирваонные тексты
-
     print('Приводим токенизированный текст назад к строкам...')
     df['text'] = df['text'].apply(lambda x: ' '.join(x))
     print('Удаляем авторов, чьё число текстов чересчур мало...')
@@ -195,6 +198,7 @@ if __name__ == '__main__':
     headers_df = header_filter(headers_df)
     print('подгружаем сами тексты из заголовков...')
     texts_df = fetch_text_from_headers(headers_df)
+    texts_df = filter_by_len(texts_df)
     texts_df.to_csv(configs.HUGE_DATA_PATH+'/dataset.csv')
 
     # texts_df = pd.read_csv(configs.HUGE_DATA_PATH+'dataset.csv')
