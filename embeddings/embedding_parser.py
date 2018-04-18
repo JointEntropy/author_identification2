@@ -109,30 +109,20 @@ if __name__ == '__main__':
     # all_words = filter_most_common(all_words) #  для Counter
     # all_words = set(list(all_words)[:10*10**4])  # для обычного набора
 
-    emb_file_is_large = False
-    if emb_file_is_large:
-        # ПЕРВЫЙ СТУЛ
-        # извлекаем первые 10**5 слов из файла с эмбедингами
-        pop_words, emb_matr = read_emb(emb_path, 2*10**5)
-        print('Всего слов в  train', len(all_words))
-        print('Общих слов в первой', len(all_words & set(pop_words)))
+    # извлекаем первые 10**5 слов из файла с эмбедингами
+    pop_words, emb_matr = read_emb(emb_path, 2*10**5)
+    print('Всего слов в  train', len(all_words))
+    print('Общих слов в первой', len(all_words & set(pop_words)))
 
-        remain_seek_words = list(all_words - set(pop_words))
-        #
-        extra_words, extra_emb = select_remain(emb_path, remain_seek_words)
-        print('Не нашлось слов', len(set(remain_seek_words) - set(extra_words)))
-        print('Нашлось дополнительных слов', len(extra_words))
+    remain_seek_words = set(list(all_words - set(pop_words)))
+    #
+    extra_words, extra_emb = select_remain(emb_path, remain_seek_words)
+    print('Не нашлось слов', len(set(remain_seek_words) - set(extra_words)))
+    print('Нашлось дополнительных слов', len(extra_words))
 
-        # Сохраняем результат
-        total_words = pop_words + extra_words
-        total_emb = np.concatenate([emb_matr, extra_emb])
-    else:
-        # ВТОРОЙ СТУЛ
-        pop_words, emb_matr = read_emb(emb_path, max_words=None)
-        common_words = all_words & set(pop_words)
-        select_mask = pd.Series(pop_words).isin(common_words)
-        total_words, total_emb = np.array(pop_words)[select_mask], emb_matr[select_mask]
-
+    # Сохраняем результат
+    total_words = pop_words + extra_words
+    total_emb = np.concatenate([emb_matr, extra_emb])
     # сохраняем
     total_words = dict((word, idx) for idx, word in enumerate(total_words))
     save_obj(total_words, output_words_path)
