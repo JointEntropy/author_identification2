@@ -11,7 +11,7 @@ import configs
 from char_lstm_preprocess import filter_chars
 import numpy as np
 from tqdm import tqdm
-from word_lstm_preprocess import mystem2upos
+
 from pymystem3 import Mystem
 
 oc2upos = {  # OPENCORPORA(pymorphy2)  to UPoS
