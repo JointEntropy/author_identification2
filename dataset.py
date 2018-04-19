@@ -8,7 +8,7 @@ import configs
 import os
 import json
 import configs
-from word_lstm_preprocess import simple_tokenizer, filter_chars, get_normalized_pos_texts
+from word_lstm_preprocess import simple_tokenizer, filter_chars
 
 
 headers_csv_path = 'data/prepared_info.csv'
