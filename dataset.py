@@ -112,13 +112,10 @@ def filter_by_samples_count(df, samples_threshold=10, verbose=1):
     return data
 
 
-
-
-
 def preprocessing(df, encode,
                   inputlen=50,  # input max sequence length
                   shuffle=False,
-                  truncate=True,
+                  split=True,
                   ohe=None):
     """
     Берёт df  с полями text и author.
@@ -133,9 +130,9 @@ def preprocessing(df, encode,
 
     :param inputlen:  максимальная длина последовательности
     :param shuffle:   перемешивать ли смэплы
-    :param truncate: если включен, то df число сэмплов  в обучение будет отличаться от кол-ва сэмплов в df.
+    :param split: если включен, то df число сэмплов  в обучение будет отличаться от кол-ва сэмплов в df.
     :param ohe:       обученный one hot encoder для авторов.
-    :return:
+    :return: contexts,labels,[groups if split]
     """
     from keras.preprocessing.sequence import pad_sequences
 
@@ -143,19 +140,20 @@ def preprocessing(df, encode,
         labels = df['author'].values.reshape(-1, 1)
     else:
         labels = ohe.transform(df['author'].values.reshape(-1, 1))
-    contexts, labels = df['text'].values,  labels
-    contexts = encode(contexts)
-    if not truncate:
+    contexts, labels = encode(df['text'].values),  labels
+    if split:
         def split_long(texts, class_labels, threshold):
             res_texts = []
             res_labels = []
-            for text, label in zip(texts, class_labels):
+            res_groups = []
+            for i, (text, label) in enumerate(zip(texts, class_labels)):
                 if len(text) > threshold:
                     text_split = split_sequence(text, threshold)
                     res_texts.extend(text_split)
                     res_labels.extend([label]*len(text_split))
-            return res_texts, res_labels
-        contexts, labels = split_long(contexts, labels, threshold=inputlen)
+                    res_groups.extend([i]*len(text_split))
+            return res_texts, res_labels, res_groups
+        contexts, labels, groups = split_long(contexts, labels, threshold=inputlen)
 
     # последовательности будут дополнены или усечены до одного размера в любом случае.
     contexts = pad_sequences(contexts, maxlen=inputlen)
@@ -165,9 +163,9 @@ def preprocessing(df, encode,
         np.random.shuffle(indices)
         contexts = np.asarray(contexts)[indices]
         labels = np.asarray(labels)[indices]
-    return contexts,  labels
-
-
+        if split:
+            groups = np.asarray(groups)[indices]
+    return [contexts, labels] + ([groups] if split else [])
 
 
 def harmonize_textsdf(df, inputlen):
@@ -183,9 +181,6 @@ def harmonize_textsdf(df, inputlen):
         'author': [],
         'text': []
     })
-
-
-
     for i, sample in df.iterrows():
         sample, label = sample['text'], sample['author']
         if len(sample) > 1.5*inputlen:
@@ -199,16 +194,6 @@ def harmonize_textsdf(df, inputlen):
     return res
 
 
-# def do_many_things(df):
-#     print('Токенезируем')
-#     tokenized = filter_chars(df['text']).apply(simple_tokenizer)
-#     df['text'] = tokenized
-#     print('Нормализуем слова и добавляем к ним части речи...')
-#     df['text'] = list(get_normalized_pos_texts(df['text']))  # принимает токензирваонные тексты
-#     print('Приводим токенизированный текст назад к строкам...')
-#     df['text'] = df['text'].apply(lambda x: ' '.join(x))
-#     print('Удаляем авторов, чьё число текстов чересчур мало...')
-#     return filter_by_samples_count(df)
 
 
 if __name__ == '__main__':
