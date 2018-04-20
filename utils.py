@@ -1,5 +1,6 @@
 import pickle
 import os
+import numpy as np
 import json
 from scipy.sparse import csr_matrix
 
@@ -61,6 +62,17 @@ def json_load(filepath):
 def save_sparse(matr, pth):
     with open(pth, 'wb') as f:
         pickle.dump(csr_matrix(matr), f)
+
+
+def split_sequence(seq, maxlen):
+    """
+    Split text into parts of size inputlen.
+    :param seq:
+    :param maxlen: max len(in tokens) of text.
+    :return:
+    """
+    seqs = np.array_split(list(seq), int(len(seq) / maxlen))
+    return seqs
 
 
 if __name__ == '__main__':
