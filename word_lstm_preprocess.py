@@ -193,12 +193,11 @@ if __name__ == '__main__':
 
 
     ### TO PREPARE(normalize) DATASET TEXTS
-    output_normalized_path = 'data/dataset'
-
-    data = pd.read_csv('data/dataset.csv')
+    data = pd.read_csv(configs.HUGE_DATA_PATH + '/dataset.csv')
     filtered_data = filter_chars(data['text'])
-    data['text'] = normalize_texts(data['text'])
-    pd.data
+    nm = Normalizer()
+    data['text'] = nm.normalize(filtered_data)
+    data.to_csv(configs.HUGE_DATA_PATH + '/normalized_dataset.csv')
 
 
 

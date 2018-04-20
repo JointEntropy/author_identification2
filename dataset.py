@@ -133,7 +133,11 @@ def preprocessing(df, encode,
     :return:
     """
     from keras.preprocessing.sequence import pad_sequences
-    labels = ohe.transform(df['author'].values.reshape(-1, 1))
+
+    if ohe is None:
+        labels = df['author'].values.reshape(-1, 1)
+    else:
+        labels = ohe.transform(df['author'].values.reshape(-1, 1))
     contexts, labels = df['text'].values,  labels
     contexts = encode(contexts)
     contexts = pad_sequences(contexts, maxlen=inputlen)
@@ -154,7 +158,10 @@ def harmonize_textsdf(df, inputlen):
     :return:
     """
     to_remove = []
-    res = df
+    res = pd.DataFrame({
+        'author': [],
+        'text': []
+    })
 
     def split_text(text, classlabel, inputlen):
         """
@@ -173,33 +180,39 @@ def harmonize_textsdf(df, inputlen):
         if len(sample) > 1.5*inputlen:
             to_remove.append(i)
             res = pd.concat([res, split_text(sample, label, inputlen)], axis=0).reset_index(drop=True)
-    remain = set(res.index) - set(to_remove)
-    res = res.loc[list(remain)].reset_index(drop=True)
+    res = res.reset_index(drop=True)
+    remain_idx = list(set(df.index.values) - set(to_remove))
+    res = pd.concat([df.loc[remain_idx], res], axis=0).reset_index(drop=True)
     return res
 
 
-def do_many_things(df):
-    print('Токенезируем')
-    tokenized = filter_chars(df['text']).apply(simple_tokenizer)
-    df['text'] = tokenized
-    print('Нормализуем слова и добавляем к ним части речи...')
-    df['text'] = list(get_normalized_pos_texts(df['text']))  # принимает токензирваонные тексты
-    print('Приводим токенизированный текст назад к строкам...')
-    df['text'] = df['text'].apply(lambda x: ' '.join(x))
-    print('Удаляем авторов, чьё число текстов чересчур мало...')
-    return filter_by_samples_count(df)
+# def do_many_things(df):
+#     print('Токенезируем')
+#     tokenized = filter_chars(df['text']).apply(simple_tokenizer)
+#     df['text'] = tokenized
+#     print('Нормализуем слова и добавляем к ним части речи...')
+#     df['text'] = list(get_normalized_pos_texts(df['text']))  # принимает токензирваонные тексты
+#     print('Приводим токенизированный текст назад к строкам...')
+#     df['text'] = df['text'].apply(lambda x: ' '.join(x))
+#     print('Удаляем авторов, чьё число текстов чересчур мало...')
+#     return filter_by_samples_count(df)
 
 
 if __name__ == '__main__':
     # открываем данные с заголовками текстов.
     headers_df = pd.read_csv(headers_csv_path, sep=',', quotechar='/', index_col='id')
-
+    #headers_df = headers_df[:11000]
     print('фильтруем тексты по метаинформации о них в строках заголовков...')
     headers_df = header_filter(headers_df)
     print('подгружаем сами тексты из заголовков...')
     texts_df = fetch_text_from_headers(headers_df)
-    texts_df = filter_by_len(texts_df)
-    texts_df.to_csv(configs.HUGE_DATA_PATH+'/dataset.csv')
+    texts_df = filter_by_len(texts_df, 1000)
+
+    median = np.median(texts_df['text'].apply(len))
+    print(median)
+
+    texts_df = harmonize_textsdf(texts_df, median)
+    texts_df.to_csv(configs.HUGE_DATA_PATH+'/dataset.csv', index=False)
 
     # texts_df = pd.read_csv(configs.HUGE_DATA_PATH+'dataset.csv')
     # texts_df = do_many_things(texts_df)
