@@ -115,7 +115,6 @@ def filter_by_samples_count(df, samples_threshold=10, verbose=1):
 def preprocessing(df, encode,
                   inputlen=50,  # input max sequence length
                   shuffle=False,
-                  split=True,
                   ohe=None):
     """
     Берёт df  с полями text и author.
@@ -130,7 +129,6 @@ def preprocessing(df, encode,
 
     :param inputlen:  максимальная длина последовательности
     :param shuffle:   перемешивать ли смэплы
-    :param split: если включен, то df число сэмплов  в обучение будет отличаться от кол-ва сэмплов в df.
     :param ohe:       обученный one hot encoder для авторов.
     :return: contexts,labels,[groups if split]
     """
@@ -141,20 +139,6 @@ def preprocessing(df, encode,
     else:
         labels = ohe.transform(df['author'].values.reshape(-1, 1))
     contexts, labels = encode(df['text'].values),  labels
-    if split:
-        def split_long(texts, class_labels, threshold):
-            res_texts = []
-            res_labels = []
-            res_groups = []
-            for i, (text, label) in enumerate(zip(texts, class_labels)):
-                if len(text) > threshold:
-                    text_split = split_sequence(text, threshold)
-                    res_texts.extend(text_split)
-                    res_labels.extend([label]*len(text_split))
-                    res_groups.extend([i]*len(text_split))
-            return res_texts, res_labels, res_groups
-        contexts, labels, groups = split_long(contexts, labels, threshold=inputlen)
-
     # последовательности будут дополнены или усечены до одного размера в любом случае.
     contexts = pad_sequences(contexts, maxlen=inputlen)
 
@@ -163,54 +147,69 @@ def preprocessing(df, encode,
         np.random.shuffle(indices)
         contexts = np.asarray(contexts)[indices]
         labels = np.asarray(labels)[indices]
-        if split:
-            groups = np.asarray(groups)[indices]
-    return [contexts, labels] + ([groups] if split else [])
+    return [contexts, labels]
 
 
-def harmonize_textsdf(df, inputlen):
-    """
-    Harmonize dataset texts in such way:
-    to long texts is splitted into parts to preserve each text size(in tokens)  in range 1.5*inputlen.
-    :param df:
-    :param inputlen:
-    :return:
-    """
-    to_remove = []
-    res = pd.DataFrame({
-        'author': [],
-        'text': []
-    })
-    for i, sample in df.iterrows():
-        sample, label = sample['text'], sample['author']
-        if len(sample) > 1.5*inputlen:
-            to_remove.append(i)
-            split = split_sequence(sample, inputlen)
-            extra_split = pd.DataFrame({'text': pd.Series(split).apply(lambda x: ''.join(x)), 'author': label})
-            res = pd.concat([res, extra_split], axis=0).reset_index(drop=True)
-    res = res.reset_index(drop=True)
-    remain_idx = list(set(df.index.values) - set(to_remove))
-    res = pd.concat([df.loc[remain_idx], res], axis=0).reset_index(drop=True)
-    return res
+# def harmonize_textsdf(df, inputlen):
+#     """
+#     Harmonize dataset texts in such way:
+#     to long texts is splitted into parts to preserve each text size(in tokens)  in range 1.5*inputlen.
+#     :param df:
+#     :param inputlen:
+#     :return:
+#     """
+#     to_remove = []
+#     res = pd.DataFrame({
+#         'author': [],
+#         'text': []
+#     })
+#     for i, sample in df.iterrows():
+#         sample, label = sample['text'], sample['author']
+#         if len(sample) > 1.5*inputlen:
+#             to_remove.append(i)
+#             split = split_sequence(sample, inputlen)
+#             extra_split = pd.DataFrame({'text': pd.Series(split).apply(lambda x: ''.join(x)), 'author': label})
+#             res = pd.concat([res, extra_split], axis=0).reset_index(drop=True)
+#     res = res.reset_index(drop=True)
+#     remain_idx = list(set(df.index.values) - set(to_remove))
+#     res = pd.concat([df.loc[remain_idx], res], axis=0).reset_index(drop=True)
+#     return res
 
 
+def split_long_texts(df, threshold):
+    texts = df['text']
+    class_labels = df['author']
+
+    res_texts = []
+    res_labels = []
+    res_groups = []
+    for i, (text, label) in enumerate(zip(texts, class_labels)):
+        if len(text) > threshold:
+            text_split = split_sequence(text, threshold)
+            res_texts.extend(''.join(text) for text in text_split)
+            res_labels.extend([label]*len(text_split))
+            res_groups.extend([i]*len(text_split))
+    df = pd.DataFrame({'text': res_texts, 'author': res_labels}, index=res_groups)
+    df.index.name = 'comp_id'
+    return df
 
 
 if __name__ == '__main__':
     # открываем данные с заголовками текстов.
     headers_df = pd.read_csv(headers_csv_path, sep=',', quotechar='/', index_col='id')
-    #headers_df = headers_df[:11000]
+
     print('фильтруем тексты по метаинформации о них в строках заголовков...')
     headers_df = header_filter(headers_df)
     print('подгружаем сами тексты из заголовков...')
     texts_df = fetch_text_from_headers(headers_df)
     texts_df = filter_by_len(texts_df, 1000)
 
-    median = np.median(texts_df['text'].apply(len))
-    print(median)
-
-    texts_df = harmonize_textsdf(texts_df, median)
-    texts_df.to_csv(configs.HUGE_DATA_PATH+'/dataset.csv', index=False)
+    # median = np.median(texts_df['text'].apply(len))
+    # print(median)
+    split_threshold = 1500 #median
+    # texts_df = harmonize_textsdf(texts_df, median)
+    texts_df = split_long_texts(texts_df, split_threshold)  # теперь index - номер произведения, и он дублируется.
+    texts_df.to_csv(configs.HUGE_DATA_PATH+'/dataset.csv')
 
     # texts_df = pd.read_csv(configs.HUGE_DATA_PATH+'dataset.csv')
     # texts_df = do_many_things(texts_df)
