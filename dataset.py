@@ -18,7 +18,6 @@ def inverse_ohe(ohe_outputs, ohe_encoder):
     return ohe_encoder.active_features_[ohe_outputs.argmax(axis=1)]
 
 
-
 def header_filter(headers_df):
     df = headers_df
     # оставляем авторов, чье число произвдеений больше 100
@@ -41,7 +40,7 @@ def fetch_text_from_headers(headers_df):
             fcontent = json.load(f)
             text = fcontent['content']
             texts.append(text)
-    return pd.DataFrame({'text': texts, 'author': headers_df['author'].values})
+    return pd.DataFrame({'text': texts, 'name': headers_df['name'].values, 'author': headers_df['author'].values})
 
 
 def filter_by_len(df, low_threshold=250):
@@ -176,14 +175,12 @@ def preprocessing(df, encode,
 #     return res
 
 
-def split_long_texts(df, threshold):
-    texts = df['text']
-    class_labels = df['author']
+def split_long_texts(texts, labels,  threshold):
 
     res_texts = []
     res_labels = []
     res_groups = []
-    for i, (text, label) in enumerate(zip(texts, class_labels)):
+    for i, (text, label) in enumerate(zip(texts, labels)):
         if len(text) > threshold:
             text_split = split_sequence(text, threshold)
             res_texts.extend(''.join(text) for text in text_split)
@@ -203,15 +200,17 @@ if __name__ == '__main__':
     print('подгружаем сами тексты из заголовков...')
     texts_df = fetch_text_from_headers(headers_df)
     texts_df = filter_by_len(texts_df, 1000)
+    texts_df.to_csv(configs.HUGE_DATA_PATH+'/dataset_with_names.csv', index=False)
 
-    # median = np.median(texts_df['text'].apply(len))
-    # print(median)
-    split_threshold = 1500 #median
-    # texts_df = harmonize_textsdf(texts_df, median)
-    texts_df = split_long_texts(texts_df, split_threshold)  # теперь index - номер произведения, и он дублируется.
-    texts_df.to_csv(configs.HUGE_DATA_PATH+'/dataset.csv')
-
-    # texts_df = pd.read_csv(configs.HUGE_DATA_PATH+'dataset.csv')
-    # texts_df = do_many_things(texts_df)
-    # print('сохраняем сбрасывая индекс(чтобы был без пропусков...')
-    # texts_df.to_csv('data/dataset.csv', index=False)
+    #
+    # # median = np.median(texts_df['text'].apply(len))
+    # # print(median)
+    # split_threshold = 1500 #median
+    # # texts_df = harmonize_textsdf(texts_df, median)
+    # texts_df = split_long_texts(texts_df['text'], texts_df['author'], split_threshold)
+    # texts_df.to_csv(configs.HUGE_DATA_PATH+'/dataset.csv')
+    #
+    # # texts_df = pd.read_csv(configs.HUGE_DATA_PATH+'dataset.csv')
+    # # texts_df = do_many_things(texts_df)
+    # # print('сохраняем сбрасывая индекс(чтобы был без пропусков...')
+    # # texts_df.to_csv('data/dataset.csv', index=False)
