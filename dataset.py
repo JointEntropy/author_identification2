@@ -186,6 +186,10 @@ def split_long_texts(texts, labels,  threshold):
             res_texts.extend(''.join(text) for text in text_split)
             res_labels.extend([label]*len(text_split))
             res_groups.extend([i]*len(text_split))
+        else:
+            res_texts.append(text)
+            res_labels.append(label)
+            res_groups.append(i)
     df = pd.DataFrame({'text': res_texts, 'author': res_labels}, index=res_groups)
     df.index.name = 'comp_id'
     return df

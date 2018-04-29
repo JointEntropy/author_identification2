@@ -4,7 +4,6 @@ import pandas as pd
 from utils import save_obj
 import configs
 
-
 ALLOWED_CHARS = {chr(chr_idx) for chr_idx in range(ord('а'), ord('я')+1)}
 ALLOWED_CHARS |= set('ё,.—?!: \t\n') #«»
 
@@ -23,8 +22,13 @@ def filter_chars(ser, allowed=ALLOWED_CHARS, forbidden2space=True):
     """
     ser = ser.str.strip()
     ser = ser.str.lower()
+
+    all_chars = set(chain.from_iterable(ser.values))
+    forbidden = all_chars - allowed
     if forbidden2space:
-        return ser.apply(lambda item: ''.join((c if c in allowed else ' ') for c in item))
+        translation = str.maketrans(''.join(forbidden), ' ' * len(forbidden))
+        return ser.str.translate(translation)
+        # return ser.apply(lambda item: ''.join((c if c in allowed else ' ') for c in item))
     else:
         return ser.apply(lambda item: ''.join(filter(lambda ch: ch in allowed, item)))
 
