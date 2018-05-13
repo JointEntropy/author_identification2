@@ -1,6 +1,6 @@
-
 import string
 from tqdm import tqdm
+from functools import partial
 from itertools import chain
 from collections import Counter
 from utils import save_obj
@@ -14,30 +14,30 @@ from tqdm import tqdm
 
 from pymystem3 import Mystem
 
-oc2upos = {  # OPENCORPORA(pymorphy2)  to UPoS
-    'NOUN'	: 'NOUN',
-    'ADJF'	: 'ADJ',
-    'ADJS'	: 'ADJ',
-    'COMP'	: 'ADJ',
-    'VERB'	: 'VERB',
-    'INFN'	: 'VERB',
-
-    'PRTF'	: 'VERB',  # причастие (полное)	прочитавший, прочитанная
-    'PRTS'	: 'VERB',  # причастие (краткое)	прочитана
-
-    'GRND'	: 'VERB',  # деепричастие	прочитав, рассказывая
-    'NUMR'	: 'NUN',   # числительное	три, пятьдесят
-
-    'ADVB'	: 'ADV',   # наречие
-
-    'NPRO'	: 'NOUN',  # местоимение-существительное	он
-    'PRED'	: 'VERB',  # предикатив	некогда
-    'PREP'	: 'PRT',   # предлог	в
-
-    'CONJ'	: 'SCONJ',  # союзы
-    'PRCL'	: 'PRT',   # частицы
-    'INTJ'	: 'INTJ'       # междометие	ой
-}
+# oc2upos = {  # OPENCORPORA(pymorphy2)  to UPoS
+#     'NOUN'	: 'NOUN',
+#     'ADJF'	: 'ADJ',
+#     'ADJS'	: 'ADJ',
+#     'COMP'	: 'ADJ',
+#     'VERB'	: 'VERB',
+#     'INFN'	: 'VERB',
+#
+#     'PRTF'	: 'VERB',  # причастие (полное)	прочитавший, прочитанная
+#     'PRTS'	: 'VERB',  # причастие (краткое)	прочитана
+#
+#     'GRND'	: 'VERB',  # деепричастие	прочитав, рассказывая
+#     'NUMR'	: 'NUN',   # числительное	три, пятьдесят
+#
+#     'ADVB'	: 'ADV',   # наречие
+#
+#     'NPRO'	: 'NOUN',  # местоимение-существительное	он
+#     'PRED'	: 'VERB',  # предикатив	некогда
+#     'PREP'	: 'PRT',   # предлог	в
+#
+#     'CONJ'	: 'SCONJ',  # союзы
+#     'PRCL'	: 'PRT',   # частицы
+#     'INTJ'	: 'INTJ'       # междометие	ой
+# }
 
 
 mystem2upos = {  # stolen from https://github.com/akutuzov/universal-pos-tags/blob/4653e8a9154e93fe2f417c7fdb7a357b7d6ce333/ru-rnc.map
@@ -116,6 +116,13 @@ def pymorphy_normalizer(ser):
         yield [extract_pos(word) for word in words]
 
 
+# for mystem
+def pos_extractor(token, mapping):
+    normal_form, pos = token['lex'], token['gr'].split('=')[0].split(',')[0]
+    pos = mapping.get(pos, 'X') if mapping  is not None else pos
+    return '{}_{}'.format(normal_form, pos)
+
+
 def mystem_normalizer(texts, batch_size=150, mapping=mystem2upos):
     """
     Normalizer(lemmatisation and PoS tagging) with Mystem backend.
@@ -125,11 +132,6 @@ def mystem_normalizer(texts, batch_size=150, mapping=mystem2upos):
     :return:
     """
     m = Mystem()  # not very good place to store it.
-
-    def pos_extractor(token, mapping):
-        normal_form, pos = token['lex'], token['gr'].split('=')[0].split(',')[0]
-        pos = mapping.get(pos, 'X') if mapping  is not None else pos
-        return '{}_{}'.format(normal_form, pos)
 
     for batch_start in range(0, len(texts), batch_size):
         batch = texts[batch_start: batch_start + batch_size]
@@ -175,29 +177,29 @@ class Normalizer:
 
 
 if __name__ == '__main__':
-    ### TO PREPROCESS
-    # output_words_path = configs.WORDS_PATH + '/uPoS_words'
-    #
-    # data = pd.read_csv('data/dataset.csv')
+    output_words_path = configs.WORDS_PATH + '/uPoS_words'
+
+    data = pd.read_csv(configs.HUGE_DATA_PATH+'/normalized_loveread_fantasy_0.csv')
+    data['text'] = data['text'].fillna('  ')
     # filtered_data = filter_chars(data['text'])
+    filtered_data = data['text']
+    gen = chain.from_iterable(t.split() for t in filtered_data)
     # gen = chain(extract_from(filtered_data,
-    #                          extractor=extract_word_pos,
+    #                          extractor=partial(pos_extractor, mapping=mystem2upos),
     #                          tokenizer=simple_tokenizer))
-    # poswords = Counter(gen)
-    # # хранить counter правильнее, потому что потом если что можно выкинуть слишком редкие слова. Иначе
-    # # поиск этих слов в embedding'ах происходит непозволительно долго
-    #
+    poswords = Counter(gen)
     # save_obj(poswords, output_words_path)
-    # print(poswords)
+    print(poswords.most_common(10000)[2000:10000])
 
-
-
-    ### TO PREPARE(normalize) DATASET TEXTS
-    data = pd.read_csv(configs.HUGE_DATA_PATH + '/dataset.csv')
-    filtered_data = filter_chars(data['text'])
-    nm = Normalizer()
-    data['text'] = nm.normalize(filtered_data)
-    data.to_csv(configs.HUGE_DATA_PATH + '/normalized_dataset.csv')
+    #
+    #
+    # ### TO PREPARE(normalize) DATASET TEXTS
+    # for chunk in range(4):
+    #     data = pd.read_csv(configs.HUGE_DATA_PATH + '/loveread_fantasy_dataset_{}.csv'.format(chunk))
+    #     filtered_data = filter_chars(data['text'])
+    #     nm = Normalizer()
+    #     data['text'] = nm.normalize(filtered_data)
+    #     data.to_csv(configs.HUGE_DATA_PATH + '/normalized_loveread_fantasy_{}.csv'.format(chunk))
 
 
 

@@ -11,7 +11,7 @@ import configs
 from word_lstm_preprocess import simple_tokenizer, filter_chars
 from utils import split_sequence
 
-headers_csv_path = 'data/prepared_info.csv'
+headers_csv_path = 'data/loveread_fantasy_log.csv'
 
 
 def inverse_ohe(ohe_outputs, ohe_encoder):
@@ -137,7 +137,7 @@ def preprocessing(df, encode,
         labels = df['author'].values.reshape(-1, 1)
     else:
         labels = ohe.transform(df['author'].values.reshape(-1, 1))
-    contexts, labels = encode(df['text'].values),  labels
+    contexts, labels = encode(df['text']),  labels  # если не пашет в этой строке добавить .values к df['text']
     # последовательности будут дополнены или усечены до одного размера в любом случае.
     contexts = pad_sequences(contexts, maxlen=inputlen)
 
@@ -149,38 +149,12 @@ def preprocessing(df, encode,
     return [contexts, labels]
 
 
-# def harmonize_textsdf(df, inputlen):
-#     """
-#     Harmonize dataset texts in such way:
-#     to long texts is splitted into parts to preserve each text size(in tokens)  in range 1.5*inputlen.
-#     :param df:
-#     :param inputlen:
-#     :return:
-#     """
-#     to_remove = []
-#     res = pd.DataFrame({
-#         'author': [],
-#         'text': []
-#     })
-#     for i, sample in df.iterrows():
-#         sample, label = sample['text'], sample['author']
-#         if len(sample) > 1.5*inputlen:
-#             to_remove.append(i)
-#             split = split_sequence(sample, inputlen)
-#             extra_split = pd.DataFrame({'text': pd.Series(split).apply(lambda x: ''.join(x)), 'author': label})
-#             res = pd.concat([res, extra_split], axis=0).reset_index(drop=True)
-#     res = res.reset_index(drop=True)
-#     remain_idx = list(set(df.index.values) - set(to_remove))
-#     res = pd.concat([df.loc[remain_idx], res], axis=0).reset_index(drop=True)
-#     return res
-
-
 def split_long_texts(texts, labels,  threshold):
 
     res_texts = []
     res_labels = []
     res_groups = []
-    for i, (text, label) in enumerate(zip(texts, labels)):
+    for i, (text, label) in enumerate(zip(tqdm(texts), labels)):
         if len(text) > threshold:
             text_split = split_sequence(text, threshold)
             res_texts.extend(''.join(text) for text in text_split)
@@ -198,23 +172,46 @@ def split_long_texts(texts, labels,  threshold):
 if __name__ == '__main__':
     # открываем данные с заголовками текстов.
     headers_df = pd.read_csv(headers_csv_path, sep=',', quotechar='/', index_col='id')
+    print(headers_df['author'].value_counts().shape[0])
 
-    print('фильтруем тексты по метаинформации о них в строках заголовков...')
+    headers_df['total_count'] = headers_df.groupby('author')['name'].transform('count')
+    headers_df.columns = ['name', 'author', 'url', 'translator', 'page', 'total_count']
+
+    headers_df = headers_df[headers_df['page'] != 1]
+    headers_df['a_plus_name'] = headers_df['author'] + headers_df['name']
+    headers_df = headers_df[headers_df['page'] != headers_df.groupby('a_plus_name')['page'].transform('max')]
+
+    # # если необходимо
+    headers_df['translator'] = headers_df['translator'].replace({False: None})
+    # print('фильтруем тексты по метаинформации о них в строках заголовков...')
+
     headers_df = header_filter(headers_df)
-    print('подгружаем сами тексты из заголовков...')
-    texts_df = fetch_text_from_headers(headers_df)
-    texts_df = filter_by_len(texts_df, 1000)
-    texts_df.to_csv(configs.HUGE_DATA_PATH+'/dataset_with_names.csv', index=False)
 
-    #
-    # # median = np.median(texts_df['text'].apply(len))
-    # # print(median)
-    # split_threshold = 1500 #median
-    # # texts_df = harmonize_textsdf(texts_df, median)
-    # texts_df = split_long_texts(texts_df['text'], texts_df['author'], split_threshold)
-    # texts_df.to_csv(configs.HUGE_DATA_PATH+'/dataset.csv')
-    #
-    # # texts_df = pd.read_csv(configs.HUGE_DATA_PATH+'dataset.csv')
-    # # texts_df = do_many_things(texts_df)
-    # # print('сохраняем сбрасывая индекс(чтобы был без пропусков...')
-    # # texts_df.to_csv('data/dataset.csv', index=False)
+    # print('подгружаем сами тексты из заголовков...')
+    N = headers_df.shape[0]
+    n = 4
+    chunk_size = N//n
+
+    for chunk in range(n):
+        headers_chunk = headers_df[chunk* chunk_size: (chunk+1) * chunk_size]
+        texts_df = fetch_text_from_headers(headers_chunk)
+        print(np.median(texts_df['text'].apply(len).values))
+
+        texts_df = filter_by_len(texts_df, 3000)
+        # texts_df.to_csv(configs.HUGE_DATA_PATH+'/dataset_with_names.csv', index=False)
+
+        split_threshold = 3000
+        texts_df = split_long_texts(texts_df['text'], texts_df['author'], split_threshold)
+
+        # записываем header в файл
+        texts_df[:0].to_csv(configs.HUGE_DATA_PATH + '/loveread_fantasy_dataset_{chunk}.csv'.format(chunk=chunk))
+        # записываем всё остальное
+        texts_df.to_csv(configs.HUGE_DATA_PATH+'/loveread_fantasy_dataset_{chunk}.csv'.format(chunk=chunk), mode='a')
+
+        del headers_chunk
+        del texts_df
+        #
+        # texts_df = pd.read_csv(configs.HUGE_DATA_PATH+'dataset.csv')
+        # # texts_df = do_many_things(texts_df)
+        # # print('сохраняем сбрасывая индекс(чтобы был без пропусков...')
+        # # texts_df.to_csv('data/dataset.csv', index=False)
