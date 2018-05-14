@@ -10,39 +10,40 @@ char_emb_dim = 150
 char_hidden_size = 300
 
 
-# def text_cnn():
-#     count_symbols = ALPHABET_LEN
-#     max_sequence_length = MAX_TEXT_CHARS
-#     vector_size = char_emb_dim
-#     filter_sizes = (3, 4, 5)
-#     num_filters = max_sequence_length
-#
-#     inp = Input(shape=(max_sequence_length,))
-#     emb = Embedding(count_symbols,
-#                     vector_size,
-#                     input_length=max_sequence_length,
-#                     trainable=True)(inp)
-#     dr = SpatialDropout1D(0.7)(emb)
-#     reshape = Reshape((max_sequence_length, vector_size, 1))(dr)
-#     conv_0 = Conv2D(num_filters, kernel_size=(filter_sizes[0], vector_size), padding='valid',
-#                     kernel_initializer='normal', activation='relu')(reshape)
-#     conv_1 = Conv2D(num_filters, kernel_size=(filter_sizes[1], vector_size), padding='valid',
-#                     kernel_initializer='normal', activation='relu')(reshape)
-#     conv_2 = Conv2D(num_filters, kernel_size=(filter_sizes[2], vector_size), padding='valid',
-#                     kernel_initializer='normal', activation='relu')(reshape)
-#
-#     maxpool_0 = MaxPool2D(pool_size=(max_sequence_length - filter_sizes[0] + 1, 1), strides=(1, 1),
-#                           padding='valid')(conv_0)
-#     maxpool_1 = MaxPool2D(pool_size=(max_sequence_length - filter_sizes[1] + 1, 1), strides=(1, 1),
-#                           padding='valid')(conv_1)
-#     maxpool_2 = MaxPool2D(pool_size=(max_sequence_length - filter_sizes[2] + 1, 1), strides=(1, 1),
-#                           padding='valid')(conv_2)
-#
-#     concatenated_tensor = Concatenate(axis=1)([maxpool_0, maxpool_1, maxpool_2])
-#     out = Flatten()(concatenated_tensor)
-#
-#     model = Model(inp, out)
-#     return model
+def text_cnn(ALPHABET_LEN,
+             MAX_TEXT_CHARS):
+    count_symbols = ALPHABET_LEN
+    max_sequence_length = MAX_TEXT_CHARS
+    vector_size = char_emb_dim
+    filter_sizes = (3, 4, 5)
+    num_filters = max_sequence_length
+
+    inp = Input(shape=(max_sequence_length,))
+    emb = Embedding(count_symbols,
+                    vector_size,
+                    input_length=max_sequence_length,
+                    trainable=True)(inp)
+    dr = SpatialDropout1D(0.7)(emb)
+    reshape = Reshape((max_sequence_length, vector_size, 1))(dr)
+    conv_0 = Conv2D(num_filters, kernel_size=(filter_sizes[0], vector_size), padding='valid',
+                    kernel_initializer='normal', activation='relu')(reshape)
+    conv_1 = Conv2D(num_filters, kernel_size=(filter_sizes[1], vector_size), padding='valid',
+                    kernel_initializer='normal', activation='relu')(reshape)
+    conv_2 = Conv2D(num_filters, kernel_size=(filter_sizes[2], vector_size), padding='valid',
+                    kernel_initializer='normal', activation='relu')(reshape)
+
+    maxpool_0 = MaxPool2D(pool_size=(max_sequence_length - filter_sizes[0] + 1, 1), strides=(1, 1),
+                          padding='valid')(conv_0)
+    maxpool_1 = MaxPool2D(pool_size=(max_sequence_length - filter_sizes[1] + 1, 1), strides=(1, 1),
+                          padding='valid')(conv_1)
+    maxpool_2 = MaxPool2D(pool_size=(max_sequence_length - filter_sizes[2] + 1, 1), strides=(1, 1),
+                          padding='valid')(conv_2)
+
+    concatenated_tensor = Concatenate(axis=1)([maxpool_0, maxpool_1, maxpool_2])
+    out = Flatten()(concatenated_tensor)
+
+    model = Model(inp, out)
+    return model
 
 
 def chars_encoder(ALPHABET_LEN, MAX_TEXT_CHARS):
@@ -99,6 +100,7 @@ def get_classifier(emb,
                    ALPHABET_LEN,
                    char_branch=False,
                    word_branch=True,
+                   cnn_chars=False,
                    n_classes=64):
     if word_branch:
         word_inp = Input(shape=(MAX_TEXT_WORDS,), dtype='int32')
@@ -109,8 +111,10 @@ def get_classifier(emb,
         branch = word_encoded
     if char_branch:
         char_inp = Input(shape=(MAX_TEXT_CHARS,), dtype='int32')
-        # char_encoded = text_cnn()(char_inp) #
-        char_encoded = chars_encoder(ALPHABET_LEN=ALPHABET_LEN, MAX_TEXT_CHARS=MAX_TEXT_CHARS)(char_inp)
+        if cnn_chars:
+            char_encoded = text_cnn(ALPHABET_LEN=ALPHABET_LEN, MAX_TEXT_CHARS=MAX_TEXT_CHARS)(char_inp)
+        else:
+            char_encoded = chars_encoder(ALPHABET_LEN=ALPHABET_LEN, MAX_TEXT_CHARS=MAX_TEXT_CHARS)(char_inp)
         inp = char_inp
         branch = char_encoded
 
