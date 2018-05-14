@@ -5,12 +5,13 @@ from scoring import f2_grouped_score
 
 
 class CompositionAveragePred(Callback):
-    def __init__(self, val_data, val_target, groups_labels, ohe, val_part=1):
+    def __init__(self, val_data, val_target, groups_labels, ohe, val_part=1, branches=False):
         self.split_idx = int(val_target.shape[0] * val_part)
         self.val_data = val_data  # preprocessed validation data with no index, but shuffled as comp_groups val
         self.val_target = val_target
         self.groups_labels = groups_labels
         self.ohe = ohe
+        self.branches = branches
 
     def on_epoch_end(self, epoch, logs=None):
         if logs is None:
@@ -18,7 +19,10 @@ class CompositionAveragePred(Callback):
 
         print('Epoch {} Scoring on first {} validation samples.'.format(epoch, self.split_idx))
         # отрезаем кусок на валидацию, потому что валидироваться на всём слишком долго
-        val_data = self.val_data[0][:self.split_idx]  # , self.val_data[1][:self.split_idx]]
+        if self.branches:
+            val_data = [self.val_data[0][:self.split_idx]   , self.val_data[1][:self.split_idx]]
+        else:
+            val_data = self.val_data[0][:self.split_idx]
         # предсказываем метки
         pred = self.model.predict(val_data)
         score = f2_grouped_score(pred,
