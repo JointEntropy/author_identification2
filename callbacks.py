@@ -33,14 +33,18 @@ class CompositionAveragePred(Callback):
 
 
 class GoogleDriveLogger(Callback):
-    def __init__(self, save_name_frmt, callback_model_name='lstm.h5', on_each=3):
+    def __init__(self, save_name_frmt, callback_model_name='lstm.h5', on_each=3, init_epoch=0):
         self.save_name_frmt = save_name_frmt
         self.on_each = on_each
         self.callback_model_name = callback_model_name
+        self.init_epoch = init_epoch
+        if self.init_epoch !=0:
+            print('Continue training from {} epoch!'.format(self.init_epoch))
 
     def on_epoch_end(self, epoch, logs=None):
         if logs is None:
             logs = dict()
+        epoch += self.init_epoch
         if epoch != 0 and epoch % self.on_each == 0:
             print('Saving best model to google drive.')
             gdw = DriveWrapper()

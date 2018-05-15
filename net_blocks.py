@@ -6,12 +6,9 @@ from keras.layers import Dense, Embedding, Input, concatenate, GRU, \
     BatchNormalization, GlobalAveragePooling3D, GlobalAveragePooling2D, Activation, dot, Multiply, multiply
 
 
-char_emb_dim = 150
-char_hidden_size = 300
-
-
 def text_cnn(ALPHABET_LEN,
-             MAX_TEXT_CHARS):
+             MAX_TEXT_CHARS,
+             char_emb_dim=300):
     count_symbols = ALPHABET_LEN
     max_sequence_length = MAX_TEXT_CHARS
     vector_size = char_emb_dim
@@ -23,7 +20,7 @@ def text_cnn(ALPHABET_LEN,
                     vector_size,
                     input_length=max_sequence_length,
                     trainable=True)(inp)
-    dr = SpatialDropout1D(0.7)(emb)
+    dr = SpatialDropout1D(0.5)(emb)
     reshape = Reshape((max_sequence_length, vector_size, 1))(dr)
     conv_0 = Conv2D(num_filters, kernel_size=(filter_sizes[0], vector_size), padding='valid',
                     kernel_initializer='normal', activation='relu')(reshape)
@@ -46,7 +43,8 @@ def text_cnn(ALPHABET_LEN,
     return model
 
 
-def chars_encoder(ALPHABET_LEN, MAX_TEXT_CHARS):
+def chars_encoder(ALPHABET_LEN, MAX_TEXT_CHARS,
+                  char_emb_dim=30, char_hidden_size=300):
     """
     Encoder для символьного представления
     """
@@ -67,11 +65,9 @@ def chars_encoder(ALPHABET_LEN, MAX_TEXT_CHARS):
     return encoder
 
 
-word_emb_dim = 300
-word_hidden_size = 300
-
-
-def words_encoder(MAX_NB_WORDS, MAX_TEXT_WORDS, emb_weights=None):
+def words_encoder(MAX_NB_WORDS, MAX_TEXT_WORDS, word_emb_dim=300,
+                                word_hidden_size=300,
+                                emb_weights=None):
     """
     Encoder для представления в виде слов.
     """
@@ -98,28 +94,40 @@ def get_classifier(emb,
                    MAX_TEXT_CHARS,
                    MAX_NB_WORDS,
                    ALPHABET_LEN,
+                   word_ebm_dim=300,
+                   word_hidden_size=300,
+                   char_emb_dim=30,
+                   char_hidden_size=300,
                    char_branch=False,
                    word_branch=True,
                    cnn_chars=False,
                    n_classes=64):
     if word_branch:
         word_inp = Input(shape=(MAX_TEXT_WORDS,), dtype='int32')
-        word_encoded = words_encoder(MAX_NB_WORDS=MAX_NB_WORDS,
-                                     MAX_TEXT_WORDS=MAX_TEXT_WORDS,
-                                     emb_weights=emb)(word_inp)
+        word_encoded = words_encoder( word_emb_dim=word_ebm_dim,
+                                      word_hidden_size=word_hidden_size,
+                                      MAX_NB_WORDS=MAX_NB_WORDS,
+                                      MAX_TEXT_WORDS=MAX_TEXT_WORDS,
+                                      emb_weights=emb)(word_inp)
         inp = word_inp
         branch = word_encoded
     if char_branch:
         char_inp = Input(shape=(MAX_TEXT_CHARS,), dtype='int32')
         if cnn_chars:
-            char_encoded = text_cnn(ALPHABET_LEN=ALPHABET_LEN, MAX_TEXT_CHARS=MAX_TEXT_CHARS)(char_inp)
+            char_encoded = text_cnn(ALPHABET_LEN=ALPHABET_LEN, MAX_TEXT_CHARS=MAX_TEXT_CHARS,
+                                    char_emb_dim=char_emb_dim)(char_inp)
         else:
-            char_encoded = chars_encoder(ALPHABET_LEN=ALPHABET_LEN, MAX_TEXT_CHARS=MAX_TEXT_CHARS)(char_inp)
+            char_encoded = chars_encoder(ALPHABET_LEN=ALPHABET_LEN, MAX_TEXT_CHARS=MAX_TEXT_CHARS,
+                                         char_hidden_size=char_hidden_size,
+                                         char_emb_dim=char_emb_dim)(char_inp)
         inp = char_inp
         branch = char_encoded
 
     if char_branch & word_branch:
-        concatenated = Multiply()([word_encoded, char_encoded])
+        if cnn_chars:
+            concatenated = Concatenate()([word_encoded, char_encoded])
+        else:
+            concatenated = Multiply()([word_encoded, char_encoded])
         out = Dense(n_classes, activation="softmax")(concatenated)
         return Model([word_inp, char_inp], out)
     else:
