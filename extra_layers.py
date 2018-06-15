@@ -2,6 +2,25 @@ from keras import initializers, regularizers, constraints
 from keras import backend as K
 from keras.engine import Layer
 from keras.layers import Activation
+from keras.engine.topology import Layer
+
+
+class GlobalOneHalfPooling(Layer):
+    def __init__(self, **kwargs):
+        super(GlobalOneHalfPooling, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+        super(GlobalOneHalfPooling, self).build(input_shape)
+
+    def call(self, x):
+        reduced = K.tf.reduce_mean(x, axis=2)
+        return reduced
+
+    def compute_output_shape(self, input_shape):
+        # пришло (batch_size, sent, words, emb_dim)
+        # на выходе (batch_size, sent, emb_dim)
+        output_shape = tuple([input_shape[:2], input_shape[-1]])
+        return output_shape
 
 
 class AttentionWithContext(Layer):
