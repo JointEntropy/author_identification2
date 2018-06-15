@@ -4,6 +4,7 @@ from itertools import chain
 import pandas as pd
 import configs
 from utils import save_obj
+from tqdm import tqdm
 
 
 russian_tokenizer = nltk.load('data/russian.pickle')
@@ -24,7 +25,7 @@ def group2articles(sentences, counts):
     batch = []
     count_iter = iter(counts)
     article_len = next(count_iter)
-    for i, s in enumerate(sentences):
+    for i, s in enumerate(tqdm(sentences)):
         batch.append(s)
         if len(batch) == article_len:
             article_len = next(count_iter)
