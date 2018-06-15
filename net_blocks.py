@@ -5,6 +5,63 @@ from keras.layers import Dense, Embedding, Input, concatenate, GRU, \
     Conv2D, MaxPool2D, Concatenate, Flatten, regularizers, TimeDistributed, GlobalMaxPooling2D, subtract, \
     BatchNormalization, GlobalAveragePooling3D, GlobalAveragePooling2D, Activation, dot, Multiply, multiply
 
+from keras.layers import Reshape
+from extra_layers import GlobalOneHalfPooling
+
+
+def MLP(MAX_NB_WORDS, MAX_TEXT_WORDS, word_emb_dim=300,
+        word_hidden_size=300,
+        emb_weights=None):
+    word_inp = Input(shape=(MAX_TEXT_WORDS,), dtype='int32')
+    emb = Embedding(output_dim=word_emb_dim,
+                    input_dim=MAX_NB_WORDS,
+                    input_length=MAX_TEXT_WORDS,
+                    weights=[emb_weights],
+                    mask_zero=False,
+                    name='word_emb',
+                    trainable=False)(word_inp)
+    #     att = GlobalAveragePooling()()
+    #     att = AttentionWithContext()(emb)
+    #     dr = Dropout(0.15)(att)
+    avg_pool = GlobalAveragePooling1D()(emb)
+    dr = Dense(200, activation='relu')(avg_pool)
+    drop = Dropout(0.15)(dr)
+    compressed = Dense(200, activation='relu')(drop)
+    out = Dense(n_classes, activation="softmax")(compressed)
+    return Model(word_inp, out)
+
+
+def TextLevelGRU(MAX_NB_WORDS,
+                 MAX_SENT_COUNT,
+                 MAX_WORDS_COUNT,
+                 word_emb_dim=150,
+                 word_hidden_size=300,
+                 n_classes=64,
+                 trainable=False,
+                 emb_weights=None):
+    word_inp = Input(shape=(MAX_SENT_COUNT * MAX_WORDS_COUNT,), dtype='int32')
+    emb = Embedding(output_dim=word_emb_dim,
+                    input_dim=MAX_NB_WORDS,
+                    input_length=MAX_SENT_COUNT * MAX_WORDS_COUNT,
+                    weights=[emb_weights],
+                    mask_zero=False,
+                    name='word_emb',
+                    trainable=trainable)(word_inp)
+    emb = Reshape((MAX_SENT_COUNT, MAX_WORDS_COUNT, word_emb_dim),
+                  input_shape=(MAX_SENT_COUNT * MAX_WORDS_COUNT, word_emb_dim))(emb)
+    # усредняем на уровне каждого предложения
+    emb = GlobalOneHalfPooling()(emb)
+    # пуляем цепочку усреднённых векторов  предложений в lstm
+    #     gru = Bidirectional(CuDNNGRU(units=word_hidden_size, return_sequences=True))(emb)
+    gru = Bidirectional(CuDNNGRU(units=word_hidden_size)  # , return_sequences=True)
+                        )(emb)
+    # encoder.add(BatchNormalization())
+    #     dr = AttentionWithContext()(gru)
+
+    compressed = Dense(200, activation='relu')(gru)
+    out = Dense(n_classes, activation="softmax")(compressed)
+    return Model(word_inp, out)
+
 
 def text_cnn(ALPHABET_LEN,
              MAX_TEXT_CHARS,
@@ -87,6 +144,51 @@ def words_encoder(MAX_NB_WORDS, MAX_TEXT_WORDS, word_emb_dim=300,
     encoder.add(AttentionWithContext())
 
     return encoder
+
+
+def text_level_encoder(MAX_NB_WORDS,
+                 MAX_SENT_COUNT,
+                 MAX_WORDS_COUNT,
+                 word_emb_dim=150,
+                 word_hidden_size=300,
+                 n_classes=64,
+                 trainable=False,
+                 emb_weights=None):
+    """
+    Encoder для представления на уровне предложений
+    """
+    encoder = Sequential()
+    encoder.add(Embedding(output_dim=word_emb_dim,
+                    input_dim=MAX_NB_WORDS,
+                    input_length=MAX_SENT_COUNT * MAX_WORDS_COUNT,
+                    weights=[emb_weights],
+                    mask_zero=False,
+                    name='word_emb',
+                    trainable=trainable))
+    encoder.add(Reshape((MAX_SENT_COUNT, MAX_WORDS_COUNT, word_emb_dim),
+                  input_shape=(MAX_SENT_COUNT * MAX_WORDS_COUNT, word_emb_dim)))
+    encoder.add(GlobalOneHalfPooling())
+    encoder.add(Bidirectional(CuDNNGRU(units=word_hidden_size), return_sequences=True))
+    # encoder.add(BatchNormalization())
+    encoder.add(AttentionWithContext())
+    return encoder
+
+
+def combine_encoders(encoders, shapes,
+                   average_layer=Concatenate,
+                   latent_space_dim=200, n_classes=64):
+    inputs = []
+    branches = []
+    for encoder, shape in zip(encoders, shapes):
+        inp = Input(shape=shape, dtype='int32')
+        encoder_branch = encoder(inp)
+        branches.append(encoder_branch)
+        inputs.append(inp)
+
+    concatenated = average_layer()(branches)
+    compressed = Dense(latent_space_dim)(concatenated)
+    out = Dense(n_classes, activation="softmax")(compressed)
+    return Model(inputs, out)
 
 
 def get_classifier(emb,

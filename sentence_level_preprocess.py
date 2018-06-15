@@ -28,10 +28,12 @@ def group2articles(sentences, counts):
     for i, s in enumerate(tqdm(sentences)):
         batch.append(s)
         if len(batch) == article_len:
-            article_len = next(count_iter)
+            try:
+                article_len = next(count_iter)
+            except StopIteration:
+                pass
             yield batch
             batch = []
-
 # words_count = pd.Series(list(chain.from_iterable(splitted.apply(lambda text: [len(s.split()) for s in text]))))
 
 # for chunk in range(4):
