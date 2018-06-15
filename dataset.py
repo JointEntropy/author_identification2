@@ -149,22 +149,25 @@ def preprocessing(df, encode,
     return [contexts, labels]
 
 
-def split_long_texts(texts, labels,  threshold):
+def split_long_texts(texts, labels,  names, threshold):
 
     res_texts = []
     res_labels = []
+    res_names = []
     res_groups = []
-    for i, (text, label) in enumerate(zip(tqdm(texts), labels)):
+    for i, (text, label, name) in enumerate(zip(tqdm(texts), labels, names)):
         if len(text) > threshold:
             text_split = split_sequence(text, threshold)
             res_texts.extend(''.join(text) for text in text_split)
             res_labels.extend([label]*len(text_split))
+            res_names.extend(['{}({}_{})'.format(name, i, num) for num in range(len(text_split))])
             res_groups.extend([i]*len(text_split))
         else:
             res_texts.append(text)
             res_labels.append(label)
+            res_names.append(name)
             res_groups.append(i)
-    df = pd.DataFrame({'text': res_texts, 'author': res_labels}, index=res_groups)
+    df = pd.DataFrame({'text': res_texts, 'author': res_labels, 'name': res_names}, index=res_groups)
     df.index.name = 'comp_id'
     return df
 
@@ -201,7 +204,7 @@ if __name__ == '__main__':
         # texts_df.to_csv(configs.HUGE_DATA_PATH+'/dataset_with_names.csv', index=False)
 
         split_threshold = 3000
-        texts_df = split_long_texts(texts_df['text'], texts_df['author'], split_threshold)
+        texts_df = split_long_texts(texts_df['text'], texts_df['author'], texts_df['name'], split_threshold)
 
         # записываем header в файл
         texts_df[:0].to_csv(configs.HUGE_DATA_PATH + '/loveread_fantasy_dataset_{chunk}.csv'.format(chunk=chunk))
