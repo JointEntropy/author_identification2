@@ -19,7 +19,9 @@ class GlobalOneHalfPooling(Layer):
     def compute_output_shape(self, input_shape):
         # пришло (batch_size, sent, words, emb_dim)
         # на выходе (batch_size, sent, emb_dim)
-        output_shape = tuple([input_shape[:2], input_shape[-1]])
+        shape = list(input_shape[:])
+        shape.pop(2)
+        output_shape = tuple(shape)
         return output_shape
 
 

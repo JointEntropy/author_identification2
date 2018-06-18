@@ -168,14 +168,16 @@ def text_level_encoder(MAX_NB_WORDS,
     encoder.add(Reshape((MAX_SENT_COUNT, MAX_WORDS_COUNT, word_emb_dim),
                   input_shape=(MAX_SENT_COUNT * MAX_WORDS_COUNT, word_emb_dim)))
     encoder.add(GlobalOneHalfPooling())
+    encoder.add(Dropout(0.85))
     encoder.add(Bidirectional(CuDNNGRU(units=word_hidden_size), return_sequences=True))
     # encoder.add(BatchNormalization())
-    encoder.add(AttentionWithContext())
+    encoder.add(GlobalAveragePooling1D())
+    # encoder.add(AttentionWithContext())
     return encoder
 
 
 def combine_encoders(encoders, shapes,
-                   average_layer=Concatenate,
+                   average_layer=None,
                    latent_space_dim=200, n_classes=64):
     inputs = []
     branches = []
@@ -184,8 +186,10 @@ def combine_encoders(encoders, shapes,
         encoder_branch = encoder(inp)
         branches.append(encoder_branch)
         inputs.append(inp)
-
-    concatenated = average_layer()(branches)
+    if len(branches) == 1:
+        concatenated = branches[0]
+    else:
+        concatenated = average_layer(branches)
     compressed = Dense(latent_space_dim)(concatenated)
     out = Dense(n_classes, activation="softmax")(compressed)
     return Model(inputs, out)
