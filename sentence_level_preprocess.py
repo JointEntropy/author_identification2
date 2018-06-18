@@ -6,12 +6,22 @@ import configs
 from utils import save_obj
 from tqdm import tqdm
 
-
+from keras.preprocessing.sequence import pad_sequences
 russian_tokenizer = nltk.load('data/russian.pickle')
 
 
 def split2sentences(texts):
     return texts.apply(lambda x: russian_tokenizer.tokenize(x))
+
+
+def pad_sentences_df(df, max_sent_count, max_words_count, words_tokenizer):
+    padded_sentences = df['text'].apply(
+        lambda x: x[:max_sent_count] + ['hello there' for i in range(max_sent_count - len(x))])
+    sentences_raw = chain.from_iterable(padded_sentences)
+    encoded_sentences = words_tokenizer.texts_to_sequences(sentences_raw)
+    padded_articles = pad_sequences(encoded_sentences, maxlen=max_words_count, padding='post',
+                                    truncating='post')
+    return np.array(list(group2articles(padded_articles, [max_sent_count] * df.shape[0])))
 
 
 def group2articles(sentences, counts):
