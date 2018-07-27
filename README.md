@@ -1,9 +1,8 @@
 # Author identification
 ## Программа для определения авторства художественного текста( модуль 2)
+![_](img1.png)
+![_](img2.png)
 
-### Источники данных:
-- loveread.ec 
-- ru.wikisource.org
 
 #### Язык:
 - Python 3.6
@@ -18,5 +17,10 @@
 - NumPy
 
 БД: MySQL
+
+### Источники данных:
+- loveread.ec 
+- ru.wikisource.org
+
 
 [Модуль 1]()
