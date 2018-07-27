@@ -1,20 +1,22 @@
-# holywiki
+# Author identification
+## Программа для определения авторства художественного текста( модуль 2)
 
-### Директории:
+### Источники данных:
+- loveread.ec 
+- ru.wikisource.org
 
-- data директория для более или менее небольших файлов
-- embeddings - скрипты для работы с embedding'ами
-- extra-notebooks - всопомгательные тетрадки.
-- models - готовые модели с весами.
-- samples - несколько простых примеров для демонстрации работы готовых моделей
-- scrapers - скраперы википедиии
+#### Язык:
+- Python 3.6
 
-### Файлы:
-- configs.py - файл с глобальными переменными( а-ля пакет)
+#### Основные библиотеки :
+- Keras(TensorFlow)
+- Scikit learn
+- Flask
+- Grab
+- Mystem
+- Pandas
+- NumPy
 
+БД: MySQL
 
-
-
-
-# Extra:
-other - https://github.com/brightmart/text_classification
+[Модуль 1]()
