@@ -1,5 +1,7 @@
 # Author identification
-## Программа для определения авторства художественного текста( модуль 2)
+## Определение авторства художественного текста
+(модуль 2)
+
 ![_](img1.png)
 ![_](img2.png)
 
@@ -22,5 +24,4 @@
 - loveread.ec 
 - ru.wikisource.org
 
-
-[Модуль 1]()
+[Модуль 1](https://github.com/Pichenug/author_identification1)
